@@ -103,3 +103,5 @@ search-request-min-score.html>`_ for more information.
 """
 
 INDEX_PREFIX = None
+""" Elasticsearch index name prefix.
+"""

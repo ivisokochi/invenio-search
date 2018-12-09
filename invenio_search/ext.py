@@ -109,8 +109,9 @@ class _SearchState(object):
 
             INDEX_PREFIX = self.app.config.get('INDEX_PREFIX')
             if INDEX_PREFIX is not None:
-                for alias in aliases:
-                    alias = INDEX_PREFIX + '-' + alias
+                root_name = INDEX_PREFIX + root_name
+                for a in aliases:
+                    a = INDEX_PREFIX + a
 
             for filename in resource_listdir(package_name, resource_name):
                 index_name = build_index_name(*(parts + (filename, )))
@@ -125,7 +126,7 @@ class _SearchState(object):
                     continue
 
                 if INDEX_PREFIX is not None:
-                    index_name = INDEX_PREFIX + '-' + index_name
+                    index_name = INDEX_PREFIX + index_name
 
                 assert index_name not in data, 'Duplicate index'
                 data[index_name] = self.mappings[index_name] = \
