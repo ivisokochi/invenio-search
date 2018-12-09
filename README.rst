@@ -16,7 +16,7 @@
         :target: https://travis-ci.com/RCOSDP/invenio-search
 
 .. image:: https://coveralls.io/repos/github/RCOSDP/invenio-search/badge.svg?branch=feature%2Fadd_prefix
-:target: https://coveralls.io/github/RCOSDP/invenio-search?branch=feature%2Fadd_prefix
+        :target: https://coveralls.io/github/RCOSDP/invenio-search?branch=feature%2Fadd_prefix
 
 .. image:: https://img.shields.io/pypi/v/invenio-search.svg
         :target: https://pypi.org/pypi/invenio-search
