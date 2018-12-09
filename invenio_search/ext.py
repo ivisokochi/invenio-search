@@ -107,6 +107,11 @@ class _SearchState(object):
 
             data = aliases.get(root_name, {})
 
+            INDEX_PREFIX = self.app.config.get('INDEX_PREFIX')
+            if INDEX_PREFIX is not None:
+                for alias in aliases:
+                    alias = INDEX_PREFIX + '-' + alias
+
             for filename in resource_listdir(package_name, resource_name):
                 index_name = build_index_name(*(parts + (filename, )))
                 file_path = os.path.join(resource_name, filename)
@@ -118,6 +123,9 @@ class _SearchState(object):
                 ext = os.path.splitext(filename)[1]
                 if ext not in {'.json', }:
                     continue
+
+                if INDEX_PREFIX is not None:
+                    index_name = INDEX_PREFIX + '-' + index_name
 
                 assert index_name not in data, 'Duplicate index'
                 data[index_name] = self.mappings[index_name] = \

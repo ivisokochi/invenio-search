@@ -101,3 +101,5 @@ Please refer to `Elasticsearch min_score documentation
 <https://www.elastic.co/guide/en/elasticsearch/reference/current/
 search-request-min-score.html>`_ for more information.
 """
+
+INDEX_PREFIX = None
