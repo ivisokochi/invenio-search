@@ -12,11 +12,11 @@
 .. image:: https://img.shields.io/github/license/RCOSDP/invenio-search.svg
         :target: https://github.com/RCOSDP/invenio-search/blob/master/LICENSE
 
-.. image:: https://img.shields.io/travis/RCOSDP/invenio-search.svg
+.. image:: https://travis-ci.com/RCOSDP/invenio-search.svg?branch=feature%2Fadd_prefix 
         :target: https://travis-ci.com/RCOSDP/invenio-search
 
-.. image:: https://img.shields.io/coveralls/RCOSDP/invenio-search.svg
-        :target: https://coveralls.io/r/RCOSDP/invenio-search
+.. image:: https://coveralls.io/repos/github/RCOSDP/invenio-search/badge.svg?branch=feature%2Fadd_prefix
+:target: https://coveralls.io/github/RCOSDP/invenio-search?branch=feature%2Fadd_prefix
 
 .. image:: https://img.shields.io/pypi/v/invenio-search.svg
         :target: https://pypi.org/pypi/invenio-search
