@@ -9,14 +9,14 @@
  Invenio-Search
 ================
 
-.. image:: https://img.shields.io/github/license/inveniosoftware/invenio-search.svg
-        :target: https://github.com/inveniosoftware/invenio-search/blob/master/LICENSE
+.. image:: https://img.shields.io/github/license/RCOSDP/invenio-search.svg
+        :target: https://github.com/RCOSDP/invenio-search/blob/master/LICENSE
 
-.. image:: https://img.shields.io/travis/inveniosoftware/invenio-search.svg
-        :target: https://travis-ci.org/inveniosoftware/invenio-search
+.. image:: https://img.shields.io/travis/RCOSDP/invenio-search.svg
+        :target: https://travis-ci.com/RCOSDP/invenio-search
 
-.. image:: https://img.shields.io/coveralls/inveniosoftware/invenio-search.svg
-        :target: https://coveralls.io/r/inveniosoftware/invenio-search
+.. image:: https://img.shields.io/coveralls/RCOSDP/invenio-search.svg
+        :target: https://coveralls.io/r/RCOSDP/invenio-search
 
 .. image:: https://img.shields.io/pypi/v/invenio-search.svg
         :target: https://pypi.org/pypi/invenio-search
