@@ -44,7 +44,7 @@ extras_require = {
     ],
     'elasticsearch6': [
         'elasticsearch>=6.0.0,<7.0.0',
-        'elasticsearch-dsl>=6.0.0,<6.2.0',
+        'elasticsearch-dsl>=6.0.0,<7.0.0',
     ],
     'records': [
         'invenio-records>=1.0.0',
