@@ -1,34 +1,44 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2015-2018 CERN.
+# Copyright (C) 2015-2024 CERN.
+# Copyright (C)      2022 University Münster.
+# Copyright (C)      2022 TU Wien.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
 
-r"""Elasticsearch management for Invenio.
+r"""Search management for Invenio (for Elasticsearch and OpenSearch).
 
-Allows retrieving records from a configurable backend (currently, from
-Elasticsearch).
+Allows retrieving records from a configurable backend (currently Elasticsearch
+and OpenSearch are supported).
 
 Initialization
 --------------
 
 To be able to retrieve information from *somewhere*, we first need to setup
-this *somewhere*. So make sure you have the correct version of Elasticsearch
-installed and running (currently, version 2.x and 5.x are supported):
+this *somewhere*. So make sure you have the correct version of ES/OS
+installed and running (see :ref:`installation` for supported ES/OS
+versions).
+
+For running an Elasticsearch instance we recommend using
+`Docker <https://docs.docker.com/install/>`_ and the official images `provided
+by Elastic <https://www.docker.elastic.co/>`_
+(or the OpenSearch team `<https://hub.docker.com/r/opensearchproject/opensearch>`_):
 
 .. code-block:: console
 
-   $ elasticsearch --version
-   Version: 2.4.6, Build: 5376dca/2017-07-18T12:17:44Z, JVM: 1.8.0_144
+    $ docker run -d \
+        -p 9200:9200 \
+        -e "discovery.type=single-node" \
+        docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2
 
-In this case, we are using version 2 of Elasticsearch, so make sure to install
+In this case, we are using Elasticsearch v7, so make sure to install
 ``invenio-search`` with the appropriate extras:
 
 .. code-block:: console
 
-    pip install invenio-search[elasticsearch2]
+    pip install invenio-search[elasticsearch7]
 
 .. _creating_index:
 
@@ -49,8 +59,9 @@ so create the following ``app.py`` file:
 
 This will create an empty index, which is not very useful, so let's add some
 mappings. To not reinvent the wheel, let's reuse the mappings from the example
-application. Add the following line at the end of ``app.py`` file that you
-have just created:
+application. Copy the ``examples`` directory from
+`Invenio-Search <https://github.com/inveniosoftware/invenio-search>`_.
+Add the following line at the end of ``app.py`` file that you just created:
 
 .. code-block:: python
 
@@ -58,32 +69,53 @@ have just created:
     ...
     search.register_mappings('demo', 'examples.data')
 
-The above code will look into directory ``examples/data`` and load all the
-mapping files it can find there into Elasticsearch (each file will create a new
-index). It will also add ``demo`` as an alias to each of the indexes.
+The above code will search the directory ``examples/data`` and load all the
+mapping files it can find there for the configured search engine. You can read more
+about the Elasticsearch mappings in `the official documentation
+<https://www.elastic.co/guide/en/elasticsearch/guide/current/mapping-intro.html>`_.
 
-You can read more about the Elasticsearch mappings on elasticsearch website
-(https://www.elastic.co/guide/en/elasticsearch/guide/current/mapping-intro.html).
-Now we can finally create the index.
+Now we can finally create the indexes. Each file in the mappings will create a
+new index and a top-level alias with the name ``demo``.
 
 .. code-block:: console
 
    $ export FLASK_APP=app.py
    $ flask index init
 
-If you are running Elasticsearch on your local machine, you can see that the
-indices were created correctly by going to this URL:
-http://localhost:9200/demo
-
-Let's put some data inside
+You can verify that the indices were created correctly by performing the
+following requests:
 
 .. code-block:: console
 
-   $ echo '{"title": "Hello invenio-search", "body": "test 1"}' | \
-         flask index put demo-default-v1.0.0 example
+    $ # Fetch information about the "demo" alias
+    $ curl http://localhost:9200/demo
+    $ # Fetch information about the "demo-default-v1.0.0" alias
+    $ curl http://localhost:9200/demo-default-v1.0.0
+
+.. note::
+
+    In earlier versions of Invenio-Search ``demo-default-v1.0.0`` was an
+    index but is now a write alias pointing to a suffixed index. Read more
+    about write aliases and suffixes in the Aliases_ section.
+
+Let's index some data. Open ``flask shell`` and index a document with the
+following code:
+
+.. code-block:: python
+
+    import json
+    from invenio_search import current_search_client
+
+    current_search_client.index(
+        index='demo-default-v1.0.0',
+        body=json.dumps({
+            'title': 'Hello invenio-search',
+            'body': 'test 1'
+        })
+    )
 
 No error message? Good! You can see that your new document was indexed by
-going to this URL: http://localhost:9200/demo/_search
+going to http://localhost:9200/demo/_search.
 
 Searching for data
 ~~~~~~~~~~~~~~~~~~
@@ -99,8 +131,14 @@ Python REPL.
 
    from app import app
 
+We will need a Flask application context, so let's push one:
+
+.. code-block:: python
+
+   app.app_context().push()
+
 Create a custom search class that will search for ``example`` type of
-documents inside the ``demo`` index (or you could use the default
+documents inside the ``demo`` alias (or you could use the default
 ``RecordsSearch`` class to search for all document types in all indexes):
 
 .. code-block:: python
@@ -109,16 +147,9 @@ documents inside the ``demo`` index (or you could use the default
    class ExampleSearch(RecordsSearch):
        class Meta:
            index = 'demo'
-           doc_types = ['example']
            fields = ('*', )
            facets = {}
    search = ExampleSearch()
-
-We will need a Flask application context, so let's push one:
-
-.. code-block:: python
-
-   app.app_context().push()
 
 Let's find all documents:
 
@@ -136,14 +167,16 @@ see how to setup an index and add example data).
 Creating a search page
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Let's create a simple web page where you can send queries to the Elasticsearch
+Let's create a simple web page where you can send queries to the search engine
 and see the results.
 Create a new app.py file with a route.
 
 .. code-block:: python
 
     # app.py
-    from elasticsearch_dsl.query import QueryString
+    # note: 'invenio_search.engine' imports the installed search DSL dependency library
+    #       and makes it available as 'dsl'
+    from invenio_search.engine import dsl
     from flask import Flask, jsonify, request
     from invenio_search import InvenioSearch, RecordsSearch
 
@@ -159,7 +192,7 @@ Create a new app.py file with a route.
     def index():
         search = RecordsSearch()
         if 'q' in request.values:
-            search = search.query(QueryString(query=request.values.get('q')))
+            search = search.query(dsl.QueryString(query=request.values.get('q')))
 
         return jsonify(search.execute().to_dict())
 
@@ -182,14 +215,31 @@ to remove all private documents from the search results (by ``private``
 documents, we understand all the documents that have ``public`` attribute set
 to 0).
 
-First, let's add one public and one private document to Elasticsearch:
+Open ``flask shell`` and add one public and one private document to the search engine:
 
-.. code-block:: console
+.. code-block:: python
 
-    $ echo '{"title": "Public", "body": "test 1", "public": 1}' | \
-        flask index put demo-default-v1.0.0 example
-    $ echo '{"title": "Private", "body": "test 2", "public": 0}' | \
-        flask index put demo-default-v1.0.0 example
+    import json
+    from invenio_search import current_search_client
+
+    # Index public document
+    current_search_client.index(
+        index='demo-default-v1.0.0',
+        body=json.dumps({
+            'title': 'Public',
+            'body': 'test 1',
+            'public': 1
+        })
+    )
+    # Index private document
+    current_search_client.index(
+        index='demo-default-v1.0.0',
+        body=json.dumps({
+            'title': 'Private',
+            'body': 'test 1',
+            'public': 0
+        })
+    )
 
 Now, create a new search class that will return all documents of type
 ``example`` from the ``demo`` index and select only the public ones
@@ -198,19 +248,18 @@ Now, create a new search class that will return all documents of type
 .. code-block:: python
 
     # app.py
-    from elasticsearch_dsl.query import Bool, Q, QueryString
+    from invenio_search.engine import dsl
 
     class PublicSearch(RecordsSearch):
         class Meta:
             index = 'demo'
-            doc_types = ['example']
             fields = ('*', )
             facets = {}
 
         def __init__(self, **kwargs):
             super(PublicSearch, self).__init__(**kwargs)
-            self.query = self.query._proxied & Q(
-                Bool(filter=[Q('term', public=1)])
+            self.query = dsl.Q(
+                dsl.Bool(filter=[dsl.Q('term', public=1)])
             )
 
 Update the ``index`` function and replace the search class with our new
@@ -232,38 +281,37 @@ Now, you can search for documents with ``test`` in the body.
 
 You should find only one document - the one with ``Public`` title.
 
-This is a very simple example of how to filter out some records. If you want
-to see how to hide some records if the user is not logged in, check out the
-:ref:`examplesapp`. If you want to define role based access rights control,
+This is a very simple example of how to filter out some records.
+If you want to define role based access rights control,
 check the invenio-access_ module.
 
 
 Miscellaneous
 -------------
 
-Elasticsearch version support
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because of the breaking changes that are introduced in Elasticsearch between
-major versions in relation to mappings, a specific directory structure has to
-be followed, in order to specify which JSON mapping files will be used for
-creating the Elasticsearch indices. For backwards compatibility with existing
-Invenio modules and installations, for Elasticsearch 2, mappings will be loaded
-from the root level of the package directory. You can see a full example in the
-``examples/data`` directory of the ``invenio-search`` repository:
+OpenSearch/Elasticsearch version support
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Major versions of OpenSearch/Elasticsearch can include breaking changes to mappings so
+mappings for each version of OpenSearch/Elasticsearch are stored in separate folders.
+Invenio-Search will use these mappings when creating the indices. You can
+see a full example in the ``examples/data`` directory of the Invenio-Search
+repository:
 
 .. code-block:: console
 
     $ tree --dirsfirst examples/data
 
     examples/data
-    +- demo            # Elasticsearch 2 mappings
-    |  +- authorities
-    |  |  +- authority-v1.0.0.json
-    |  +- bibliographic
-    |  |  +- bibliographic-v1.0.0.json
-    |  +- default-v1.0.0.json
-    +- v5
-    |  +- demo        # Elasticsearch 5 mappings
+    +- os-v1
+    |  +- demo        # OpenSearch 1 mappings
+    |  |  +- authorities
+    |  |  |  +- authority-v1.0.0.json
+    |  |  +- bibliographic
+    |  |  |  +- bibliographic-v1.0.0.json
+    |  |  +- default-v1.0.0.json
+    |  +- __init__.py
+    +- v7
+    |  +- demo        # Elasticsearch 7 mappings
     |  |  +- authorities
     |  |  |  +- authority-v1.0.0.json
     |  |  +- bibliographic
@@ -272,30 +320,111 @@ from the root level of the package directory. You can see a full example in the
     |  +- __init__.py
     +-- __init__.py
 
-
 Elasticsearch plugins
 ~~~~~~~~~~~~~~~~~~~~~
 
-For convenience, you can install a plugin like Elastic HQ
-(http://www.elastichq.org/) for easy introspection of your indexes and their
-content. Otherwise, you can use curl (as described here:
-https://www.elastic.co/guide/en/elasticsearch/guide/current/_talking_to_elasticsearch.html).
+For convenience, you can install a plugin like `Elastic HQ
+<http://www.elastichq.org/>`_ for easy introspection of your indexes and their
+content. Otherwise, you can use curl as described `in the official
+documentation <https://www.elastic.co/guide/en/elasticsearch/guide/current/
+_talking_to_elasticsearch.html>`_.
 
 .. _invenio-access:  https://invenio-access.readthedocs.io/
 
+.. _Aliases:
+
+Indexes and aliases
+~~~~~~~~~~~~~~~~~~~
+
+.. graphviz::
+
+    digraph D {
+        rankdir="LR"
+        node[shape=record, fixedsize=true, width=1]
+
+        R[label="records", style=rounded]
+        RD[label="records-dataset-v1.0.0", style="rounded,dashed", width=2.5]
+        RP[label="records-paper-v1.0.0", style="rounded,dashed", width=2.5]
+        RDI[label="records-dataset-v1.0.0-1564056972", width=4]
+        RPI[label="records-paper-v1.0.0-1564056972", width=4]
+
+        A[label="authors", style=rounded]
+        AA[label="authors-author-v1.0.0", style="rounded,dashed", width=2.5]
+        AAI[label="authors-author-v1.0.0-1564056972", width=4]
+
+        R -> RDI
+        R -> RPI
+        RP -> RPI
+        RD -> RDI
+
+        A -> AAI
+        AA -> AAI
+    }
+
+Indexes and aliases are organized as seen in the graph above. This example has
+three "concrete" indexes:
+
+- ``authors-author-v1.0.0-1564056972``
+- ``records-dataset-v1.0.0-1564056972``
+- ``records-paper-v1.0.0-1564056972``
+
+They all share the suffix ``1564056972``. Each index though has also a
+corresponding "write alias" with its un-suffixed name:
+
+- ``authors-author-v1.0.0 -> authors-author-v1.0.0-1564056972``
+- ``records-dataset-v1.0.0 -> records-dataset-v1.0.0-1564056972``
+- ``records-paper-v1.0.0 -> records-paper-v1.0.0-1564056972``
+
+The other aliases in the example, ``records`` and ``authors``, are top-level
+aliases pointing to all the indexes in their same hierarchy:
+
+- ``authors -> authors-author-v1.0.0-1564056972``
+- ``records -> records-dataset-v1.0.0-1564056972``
+- ``records -> records-paper-v1.0.0-1564056972``
+
+Top-level **aliases** are aliases that can point to one or multiple
+indexes. The purpose of these aliases is to group indexes and be able to
+perform searches over multiple indexes. These aliases should never be indexed
+to as the indexing will fail if they point to multiple indexes.
+
+The other type of alias is the **write alias** which is an alias that only
+points to a single index and has the same name as the index without the suffix.
+This alias should be used whenever you need to index something. The name of the
+write alias is the same as the un-suffixed index name to allow backwards
+compatibilty with previous versions of Invenio-Search.
+
+An **index** ends with a suffix which is the timestamp of the index creation
+time. The suffix allows multiple revisions of the same index to exist at the
+same time. This is useful if you want to update the mappings of an index and
+migrate to a new index. With suffixes, it's possible to keep the two versions
+of the same index and sync them. When the migration is completed the write
+alias can be pointed to the new index and the application will use the new
+index. This allows in-cluster migrations without any downtime.
+
+More information about index migrations can be found in the
+`Invenio-Index-Migrator
+<https://github.com/inveniosoftware/invenio-index-migrator>`_.
 """
 
-from __future__ import absolute_import, print_function
-
-from .api import RecordsSearch
+from .api import (
+    RecordsSearch,
+    RecordsSearchV2,
+    UnPrefixedRecordsSearch,
+    UnPrefixedRecordsSearchV2,
+)
 from .ext import InvenioSearch
 from .proxies import current_search, current_search_client
-from .version import __version__
+
+__version__ = "2.3.1"
+
 
 __all__ = (
-    '__version__',
-    'InvenioSearch',
-    'RecordsSearch',
-    'current_search',
-    'current_search_client',
+    "__version__",
+    "InvenioSearch",
+    "RecordsSearch",
+    "RecordsSearchV2",
+    "UnPrefixedRecordsSearch",
+    "UnPrefixedRecordsSearchV2",
+    "current_search",
+    "current_search_client",
 )

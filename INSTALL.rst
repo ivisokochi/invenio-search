@@ -1,23 +1,25 @@
 ..
     This file is part of Invenio.
-    Copyright (C) 2015-2018 CERN.
+    Copyright (C) 2015-2022 CERN.
 
     Invenio is free software; you can redistribute it and/or modify it
     under the terms of the MIT License; see LICENSE file for more details.
+
+..  _installation:
 
 Installation
 ============
 
 Invenio-Search is on PyPI. When you install Invenio-Search you must specify the
-appropriate extras dependency for the version of Elasticsearch you use:
+appropriate extras dependency for the version of Elasticsearch or OpenSearch you use:
 
 .. code-block:: console
 
-    $ # For Elasticsearch 2.x:
-    $ pip install invenio-search[elasticsearch2]
+    $ # For Elasticsearch 7.x:
+    $ pip install invenio-search[elasticsearch7]
 
-    $ # For Elasticsearch 5.x:
-    $ pip install invenio-search[elasticsearch5]
+    $ # For OpenSearch 2.x:
+    $ pip install invenio-search[opensearch2]
 
-    $ # For Elasticsearch 6.x:
-    $ pip install invenio-search[elasticsearch6]
+Also note that installing multiple conflicting dependencies (e.g.
+`invenio-search[opensearch2,elasticsearch7]`) will result in an error at runtime.
